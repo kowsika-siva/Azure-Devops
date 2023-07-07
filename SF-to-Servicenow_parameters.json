@@ -1,0 +1,26 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_name": {
+            "value": "LA_SFtoServicenow_Dev"
+        },
+        "connections_salesforce_name": {
+            "value": "salesforce-Dev"
+        },
+        "connections_service_now_name": {
+			"value": "service-now-Dev"
+        },
+		"Subscription_ID": {
+			"reference": {
+				"keyVault": {
+					"id": "/subscriptions/225be0b6-6988-4b65-8268-8fec4d0ff5f2/resourceGroups/Reference_POCs_RG/providers/Microsoft.KeyVault/vaults/ReferencePOC-KV1"
+				},
+				"secretName": "SubcriptionID-SK-001"
+			}
+        }
+    }
+}
+
+
+

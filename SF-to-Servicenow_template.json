@@ -1,0 +1,183 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_name": {
+            "type": "String"
+        },
+        "connections_salesforce_name": {
+            "type": "String"
+        },
+        "connections_service_now_name": {
+            "type": "String"
+        },
+		"Subscription_ID":{
+			"type": "securestring"
+		}
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_salesforce_name')]",
+            "location": "eastus",
+            "kind": "V1",
+            "properties": {
+                "displayName": "deepika.thuyamani@aspiresys.com",
+                "statuses": [
+                    {
+                        "status": "Connected"
+                    }
+                ],
+                "customParameterValues": {},
+                "nonSecretParameterValues": {
+                    "token:LoginUri": "https://login.salesforce.com",
+                    "salesforceApiVersion": "v41"
+                },
+                "createdTime": "2023-06-14T06:38:54.8149792Z",
+                "changedTime": "2023-06-19T04:48:33.2269597Z",
+                "api": {
+                    "name": "salesforce",
+                    "displayName": "Salesforce",
+                    "description": "The Salesforce Connector provides an API to work with Salesforce objects.",
+                    "iconUri": "https://connectoricons-prod.azureedge.net/releases/v1.0.1624/1.0.1624.3220/salesforce/icon.png",
+                    "brandColor": "#1EB8EB",
+                    "id": "[concat('/subscriptions/',parameters('Subscription_ID'),'/providers/Microsoft.Web/locations/eastus/managedApis/salesforce')]",
+                    "type": "Microsoft.Web/locations/managedApis"
+                },
+                "testLinks": [
+                    {
+                        "requestUri": "[concat('https://management.azure.com:443/subscriptions/',parameters('Subscription_ID'),'/resourceGroups/Reference_POCs_RG/providers/Microsoft.Web/connections/', parameters('connections_salesforce_name'), '/extensions/proxy/testconnection?api-version=2016-06-01')]",
+                        "method": "get"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_service_now_name')]",
+            "location": "eastus",
+            "kind": "V1",
+            "properties": {
+                "displayName": "Servicenow",
+                "statuses": [
+                    {
+                        "status": "Connected"
+                    }
+                ],
+                "customParameterValues": {},
+                "nonSecretParameterValues": {
+                    "instance": "https://dev155184.service-now.com",
+                    "username": "admin"
+                },
+                "createdTime": "2023-06-15T06:14:04.13234Z",
+                "changedTime": "2023-06-16T11:20:25.3851441Z",
+                "api": {
+                    "name": "service-now",
+                    "displayName": "ServiceNow",
+                    "description": "ServiceNow improves service levels, energizes employees, and enables your enterprise to work at lightspeed. Create, read and update records stored within ServiceNow including Incidents, Questions, Users and more.",
+                    "iconUri": "https://connectoricons-prod.azureedge.net/releases/v1.0.1544/1.0.1544.2640/service-now/icon.png",
+                    "brandColor": "#D1232B",
+                    "id": "[concat('/subscriptions/',parameters('Subscription_ID'),'/providers/Microsoft.Web/locations/eastus/managedApis/service-now')]",
+                    "type": "Microsoft.Web/locations/managedApis"
+                },
+                "testLinks": [
+                    {
+                        "requestUri": "[concat('https://management.azure.com:443/subscriptions/',parameters('Subscription_ID'),'/resourceGroups/Reference_POCs_RG/providers/Microsoft.Web/connections/', parameters('connections_service_now_name'), '/extensions/proxy/api/now/doc/table/schema?api-version=2016-06-01')]",
+                        "method": "get"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_name')]",
+            "location": "eastus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('connections_salesforce_name'))]",
+                "[resourceId('Microsoft.Web/connections', parameters('connections_service_now_name'))]"
+            ],
+            "tags": {
+                "Category": "EIIM-POC-GRP1"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "When_a_record_is_modified": {
+                            "recurrence": {
+                                "frequency": "Minute",
+                                "interval": 3
+                            },
+                            "evaluatedRecurrence": {
+                                "frequency": "Minute",
+                                "interval": 3
+                            },
+                            "splitOn": "@triggerBody()?['value']",
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['salesforce']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/datasets/default/tables/@{encodeURIComponent(encodeURIComponent('Contact'))}/onupdateditems"
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Get_Record": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['service-now_1']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/api/now/v2/table/@{encodeURIComponent('sc_cat_dt_app_user')}/@{encodeURIComponent(triggerBody()?['AccountId'])}",
+                                "queries": {
+                                    "sysparm_display_value": false,
+                                    "sysparm_exclude_reference_link": true
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "salesforce": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_salesforce_name'))]",
+                                "connectionName": "salesforce-Dev",
+                                "id": "[concat('/subscriptions/',parameters('Subscription_ID'),'/providers/Microsoft.Web/locations/eastus/managedApis/salesforce')]"
+                            },
+                            "service-now_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_service_now_name'))]",
+                                "connectionName": "service-now-Dev",
+                                "id": "[concat('/subscriptions/',parameters('Subscription_ID'),'/providers/Microsoft.Web/locations/eastus/managedApis/service-now')]"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
